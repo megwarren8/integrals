@@ -1,0 +1,53 @@
+# Publishes this repo to Cloudflare Pages on every push to main.
+# One-time setup (creates the Pages project and adds the two secrets this
+# workflow needs) lives in ~/Documents/megan-warren-com/add_site.sh.
+# Until those secrets exist, this workflow skips quietly instead of failing.
+
+name: Deploy to Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: cloudflare-pages-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check that Cloudflare credentials exist
+        id: creds
+        env:
+          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "CLOUDFLARE_API_TOKEN is not set on this repo yet, so the deploy is skipped."
+            echo "Run add_site.sh from ~/Documents/megan-warren-com to finish setup."
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check out the repo
+        if: steps.creds.outputs.ready == 'true'
+        uses: actions/checkout@v4
+
+      - name: Assemble the site folder
+        if: steps.creds.outputs.ready == 'true'
+        run: |
+          mkdir -p _site
+          rsync -a ./ _site/ \
+            --exclude _site --exclude .git --exclude .github
+
+      - name: Deploy to Cloudflare Pages
+        if: steps.creds.outputs.ready == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy _site --project-name=integrals-warren --branch=main --commit-dirty=true
