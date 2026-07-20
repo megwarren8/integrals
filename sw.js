@@ -14,9 +14,22 @@
  *
  * Freshness comes from the update cycle itself: every deploy changes the
  * stamped hash, so this file's bytes change, the browser installs the new
- * worker in the background and pre-caches the new book. No skipWaiting on
- * purpose: a mid-session tab is never swapped under a reader; the new build
- * takes over on the next visit (documented one-visit lag).
+ * worker in the background and pre-caches the new book.
+ *
+ * Update takeover (added 2026-07-20): self.skipWaiting() below fires on
+ * install so a newly installed worker does not wait for every open tab of
+ * the OLD worker to close first, and self.clients.claim() on activate hands
+ * this tab to the new worker right away instead of waiting for the next
+ * full navigation. Neither of those changes what is already rendered in
+ * this tab's memory, so book.src.html listens for the resulting
+ * "controllerchange" event and shows an explicit "Updated, refresh to see
+ * the latest" toast rather than reloading anything on its own; a reader
+ * mid-scroll is never yanked out from under themselves. A first-ever visit
+ * (no prior controller) never shows that toast. This replaces the old
+ * "no skipWaiting on purpose, new build takes over on the next visit"
+ * design: that one-visit lag was silent and had no user-visible signal, so
+ * a reader with a long-lived tab open (or a browser that deferred checking
+ * for updates) could sit on stale content indefinitely with no way to know.
  *
  * Deliberately never touched: anything under /api/ (the AI TA chat must
  * always hit the network), cross-origin requests (including the TA status
@@ -28,31 +41,37 @@
  * is not part of the built book; the book renders fully with zero network
  * whether or not this worker ever installs.
  */
-var BOOK_HASH = "37ca43d0e1bd6cc8";
+var BOOK_HASH = "10d43a6b49d3e632";
 var CACHE_NAME = "book-" + BOOK_HASH;
 var BOOK_PATHS = ["/", "/index.html", "/Integrals.html"];
 
 self.addEventListener("install", function (event) {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(function (cache) {
-      /* cache.add fetches "/" through the network (and through the chat
-         worker, so the stored copy carries the matching ETag). If this
-         fetch fails, install fails and the old worker plus plain network
-         behavior stay in charge; nothing breaks. */
-      return cache.add("/");
-    })
+    Promise.all([
+      caches.open(CACHE_NAME).then(function (cache) {
+        /* cache.add fetches "/" through the network (and through the chat
+           worker, so the stored copy carries the matching ETag). If this
+           fetch fails, install fails and the old worker plus plain network
+           behavior stay in charge; nothing breaks. */
+        return cache.add("/");
+      }),
+      self.skipWaiting()
+    ])
   );
 });
 
 self.addEventListener("activate", function (event) {
   event.waitUntil(
-    caches.keys().then(function (keys) {
-      return Promise.all(
-        keys
-          .filter(function (k) { return k.indexOf("book-") === 0 && k !== CACHE_NAME; })
-          .map(function (k) { return caches.delete(k); })
-      );
-    })
+    Promise.all([
+      caches.keys().then(function (keys) {
+        return Promise.all(
+          keys
+            .filter(function (k) { return k.indexOf("book-") === 0 && k !== CACHE_NAME; })
+            .map(function (k) { return caches.delete(k); })
+        );
+      }),
+      self.clients.claim()
+    ])
   );
 });
 
