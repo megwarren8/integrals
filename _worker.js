@@ -53,8 +53,8 @@ const MODEL = "claude-haiku-4-5-20251001";
  * headers. The policy stays max-age=0, must-revalidate on purpose: a
  * deploy must show up on the next visit, and with a valid validator that
  * costs one small conditional request, not a redownload. */
-const BOOK_HASH = "2c876f01b322a5df";
-const BOOK_LASTMOD = "Tue, 21 Jul 2026 13:17:55 GMT";
+const BOOK_HASH = "309b6fb3c103b721";
+const BOOK_LASTMOD = "Tue, 21 Jul 2026 22:37:46 GMT";
 const BOOK_CACHE_CONTROL = "public, max-age=0, must-revalidate";
 const BOOK_PATHS = ["/", "/index.html", "/Integrals.html"];
 
