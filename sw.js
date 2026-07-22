@@ -41,7 +41,7 @@
  * is not part of the built book; the book renders fully with zero network
  * whether or not this worker ever installs.
  */
-var BOOK_HASH = "b848f8de9bda66b1";
+var BOOK_HASH = "e32d64f512fad8e0";
 var CACHE_NAME = "book-" + BOOK_HASH;
 var BOOK_PATHS = ["/", "/index.html", "/Integrals.html"];
 
